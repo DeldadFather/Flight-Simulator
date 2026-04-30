@@ -116,8 +116,9 @@
     gap: 14px;
     background: radial-gradient(ellipse at center, #0a162888 0%, #050a14ee 100%);
     transition: opacity 0.4s;
+    z-index: 5;
   }
-  .overlay.hidden { opacity:0; pointer-events:none; }
+  .overlay.hidden { opacity:0; pointer-events:none; visibility:hidden; }
 
   .ov-title {
     font-family: 'Black Ops One', monospace;
@@ -178,7 +179,7 @@
     display: none;
     position: absolute; bottom:0; left:0; right:0; height:55%;
     pointer-events: none;
-    z-index: 10;
+    z-index: 15;
   }
   /* Show on any touch-capable device */
   @media (hover:none) and (pointer:coarse), (pointer:coarse) {
@@ -786,6 +787,8 @@ function setupPointerControls(el, onDown, onUp) {
   el.addEventListener('pointerdown', e => {
     e.preventDefault();
     unlockAudio();
+    // Allow starting the game from touch zones too
+    if (state === 'title' || state === 'over') { startGame(); return; }
     if (state === 'play') onDown();
     el.classList.add('active');
   });
@@ -810,15 +813,19 @@ function setupPointerControls(el, onDown, onUp) {
 // Apply controls
 setupPointerControls(tzUp, () => inputUp = true, () => inputUp = false);
 setupPointerControls(tzDn, () => inputDown = true, () => inputDown = false);
-tzUp.addEventListener('touchstart', e => { e.preventDefault(); if(state==='play'){inputUp=true; tzUp.classList.add('active');} unlockAudio(); }, {passive:false});
+tzUp.addEventListener('touchstart', e => { e.preventDefault(); unlockAudio(); if(state==='title'||state==='over'){startGame();return;} if(state==='play'){inputUp=true; tzUp.classList.add('active');} }, {passive:false});
 tzUp.addEventListener('touchend',   e => { e.preventDefault(); inputUp=false;  tzUp.classList.remove('active'); }, {passive:false});
 tzUp.addEventListener('touchcancel',e => { inputUp=false;  tzUp.classList.remove('active'); });
-tzDn.addEventListener('touchstart', e => { e.preventDefault(); if(state==='play'){inputDown=true; tzDn.classList.add('active');} unlockAudio(); }, {passive:false});
+tzDn.addEventListener('touchstart', e => { e.preventDefault(); unlockAudio(); if(state==='title'||state==='over'){startGame();return;} if(state==='play'){inputDown=true; tzDn.classList.add('active');} }, {passive:false});
 tzDn.addEventListener('touchend',   e => { e.preventDefault(); inputDown=false; tzDn.classList.remove('active'); }, {passive:false});
 tzDn.addEventListener('touchcancel',e => { inputDown=false; tzDn.classList.remove('active'); });
 
 // swipe — only when playing
 let touchY0 = 0;
+canvas.addEventListener('touchstart', e => {
+  touchY0 = e.touches[0].clientY;
+  unlockAudio();
+}, { passive: true });
 canvas.addEventListener('touchmove', e => {
   e.preventDefault(); // 🔥 IMPORTANT
   if(state!=='play') return;
