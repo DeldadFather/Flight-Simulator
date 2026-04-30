@@ -6,6 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="screen-orientation" content="landscape">
 <title>AFTERBURNER // SUPERSONIC RUNNER</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Black+Ops+One&display=swap');
@@ -116,9 +117,8 @@
     gap: 14px;
     background: radial-gradient(ellipse at center, #0a162888 0%, #050a14ee 100%);
     transition: opacity 0.4s;
-    z-index: 5;
   }
-  .overlay.hidden { opacity:0; pointer-events:none; visibility:hidden; }
+  .overlay.hidden { opacity:0; pointer-events:none; }
 
   .ov-title {
     font-family: 'Black Ops One', monospace;
@@ -179,7 +179,7 @@
     display: none;
     position: absolute; bottom:0; left:0; right:0; height:55%;
     pointer-events: none;
-    z-index: 15;
+    z-index: 10;
   }
   /* Show on any touch-capable device */
   @media (hover:none) and (pointer:coarse), (pointer:coarse) {
@@ -246,36 +246,68 @@
     #ctrl-hint  { display: none !important; }
   }
 
-  /* ── Mobile portrait ── */
-  @media (max-width: 600px) {
+  /* ══════════════════════════════════════════
+     PORTRAIT PHONE — rotate the whole game 90°
+     so the landscape canvas fills the screen
+     ══════════════════════════════════════════ */
+  @media (max-width: 600px) and (orientation: portrait) {
     body {
-      justify-content: flex-start;
-      padding-top: env(safe-area-inset-top, 0px);
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      background: var(--dark);
     }
+
+    /*
+      The wrapper is rotated 90° so the landscape
+      game fills the portrait screen.
+      vw/vh are swapped intentionally:
+        - rotated width  = screen height (100vh)
+        - rotated height = screen width  (100vw)
+    */
     #game-wrapper {
-      height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      display: flex;
-      flex-direction: column;
+      width:  100vh;          /* becomes the horizontal span after rotation */
+      max-width: none;
+      transform-origin: center center;
+      transform: rotate(90deg);
+      /* push it to fill the portrait viewport */
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
     }
-    #game-canvas { flex: 1; height: auto !important; }
-    .hud-val { font-size: 15px; }
+
+    /* Canvas fills the rotated wrapper */
+    #game-canvas {
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    /* Touch zones take full lower half of the rotated view */
+    #touch-zones { display: flex !important; height: 50%; }
+
+    /* Scale down HUD text so it fits the narrower rotated height */
+    .hud-val   { font-size: 14px; }
     .hud-label { font-size: 7px; }
-    .ov-sub { font-size: 9px; line-height: 1.8; }
-    .jet-btn { padding: 14px 36px; font-size: 14px; min-height: 52px; }
+    .ov-sub    { font-size: 9px; line-height: 1.8; }
+    .jet-btn   { padding: 12px 32px; font-size: 13px; min-height: 48px; }
     #ctrl-hint { display: none; }
-    #touch-zones { display: flex !important; height: 52%; }
-    .tz-icon { font-size: 14px; padding: 12px 24px; }
-    #mute-btn { top: 6px; right: 6px; font-size: 10px; padding: 5px 10px; }
-    .stat-box .sb-v { font-size: 18px; }
-    #hud { padding: 8px 10px 0; }
+    .tz-icon   { font-size: 13px; padding: 10px 20px; }
+    #mute-btn  { top: 6px; right: 6px; font-size: 10px; padding: 5px 10px; }
+    .stat-box .sb-v { font-size: 16px; }
+    #hud { padding: 6px 10px 0; }
+
+    /* Rotate the "tap hint" text back so it reads correctly */
+    #touch-hint { transform: rotate(0deg); }
   }
 
-  /* ── Landscape mobile ── */
-  @media (max-height: 450px) and (orientation: landscape) {
-    #touch-zones { display: flex !important; height: 70%; }
+  /* ── Landscape mobile (phone held sideways) ── */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #touch-zones { display: flex !important; height: 65%; }
     .tz { align-items: center; }
     .tz-icon { padding: 8px 18px; font-size: 12px; }
     .jet-btn { padding: 10px 30px; font-size: 13px; min-height: 44px; }
+    .hud-val { font-size: 14px; }
   }
 
   /* ── Safe area padding bottom ── */
@@ -311,6 +343,19 @@
       <span class="hud-label">Record</span>
       <span class="hud-val danger" id="hud-hi">0 km</span>
     </div>
+  </div>
+
+  <!-- Portrait rotate prompt -->
+  <div id="portrait-prompt" style="
+    display:none;
+    position:fixed; inset:0; z-index:999;
+    background:#050a14ee;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    font-family:'Rajdhani',sans-serif;
+  ">
+    <div style="font-size:52px;">📱➡️</div>
+    <div style="font-family:'Black Ops One',monospace;font-size:20px;color:#ffb700;letter-spacing:3px;text-align:center;">ROTATE DEVICE</div>
+    <div style="font-size:11px;letter-spacing:2px;color:#8ab4c8;text-align:center;">FOR BEST EXPERIENCE<br>ROTATE TO LANDSCAPE</div>
   </div>
 
   <!-- Start screen -->
@@ -654,30 +699,43 @@ const ctx    = canvas.getContext('2d');
 const BASE_W = 960, BASE_H = 320;
 canvas.width = BASE_W; canvas.height = BASE_H;
 
+function isPortrait() {
+  return window.innerHeight > window.innerWidth;
+}
+
 function resize() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
   const wrapper = canvas.parentElement;
-  const availW  = wrapper.clientWidth;
-  const availH  = wrapper.clientHeight || window.innerHeight;
 
-  // On portrait mobile the canvas is very wide relative to height.
-  // Allow the canvas to fill MORE of the available height so the play area isn't tiny.
-  const naturalH = BASE_H * availW / BASE_W;  // height if we fill width
-
-  if (naturalH <= availH) {
-    // Normal: canvas fits in available height — fill width
-    canvas.style.width  = availW + 'px';
+  if (isPortrait()) {
+    // Portrait mode: wrapper is CSS-rotated 90deg so logical width = vh
+    const rotatedW = vh;
+    const naturalH = BASE_H * rotatedW / BASE_W;
+    canvas.style.width  = rotatedW + 'px';
     canvas.style.height = naturalH + 'px';
+    wrapper.style.width  = rotatedW + 'px';
+    wrapper.style.height = naturalH + 'px';
   } else {
-    // Canvas would be taller than available space — constrain by height instead
-    const h = availH;
-    const w = BASE_W * h / BASE_H;
-    canvas.style.width  = Math.min(w, availW) + 'px';
-    canvas.style.height = (BASE_H * parseFloat(canvas.style.width) / BASE_W) + 'px';
+    // Landscape mode: normal scaling
+    wrapper.style.width  = '';
+    wrapper.style.height = '';
+    const availW   = Math.min(vw, 960);
+    const naturalH = BASE_H * availW / BASE_W;
+    if (naturalH <= vh) {
+      canvas.style.width  = availW + 'px';
+      canvas.style.height = naturalH + 'px';
+    } else {
+      const h = vh;
+      const w = Math.min(BASE_W * h / BASE_H, availW);
+      canvas.style.width  = w + 'px';
+      canvas.style.height = (BASE_H * w / BASE_W) + 'px';
+    }
   }
 }
 resize();
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 // ── Palette ─────────────────────────────────
 const P = {
@@ -787,8 +845,6 @@ function setupPointerControls(el, onDown, onUp) {
   el.addEventListener('pointerdown', e => {
     e.preventDefault();
     unlockAudio();
-    // Allow starting the game from touch zones too
-    if (state === 'title' || state === 'over') { startGame(); return; }
     if (state === 'play') onDown();
     el.classList.add('active');
   });
@@ -813,26 +869,33 @@ function setupPointerControls(el, onDown, onUp) {
 // Apply controls
 setupPointerControls(tzUp, () => inputUp = true, () => inputUp = false);
 setupPointerControls(tzDn, () => inputDown = true, () => inputDown = false);
-tzUp.addEventListener('touchstart', e => { e.preventDefault(); unlockAudio(); if(state==='title'||state==='over'){startGame();return;} if(state==='play'){inputUp=true; tzUp.classList.add('active');} }, {passive:false});
+tzUp.addEventListener('touchstart', e => { e.preventDefault(); if(state==='play'){inputUp=true; tzUp.classList.add('active');} unlockAudio(); }, {passive:false});
 tzUp.addEventListener('touchend',   e => { e.preventDefault(); inputUp=false;  tzUp.classList.remove('active'); }, {passive:false});
 tzUp.addEventListener('touchcancel',e => { inputUp=false;  tzUp.classList.remove('active'); });
-tzDn.addEventListener('touchstart', e => { e.preventDefault(); unlockAudio(); if(state==='title'||state==='over'){startGame();return;} if(state==='play'){inputDown=true; tzDn.classList.add('active');} }, {passive:false});
+tzDn.addEventListener('touchstart', e => { e.preventDefault(); if(state==='play'){inputDown=true; tzDn.classList.add('active');} unlockAudio(); }, {passive:false});
 tzDn.addEventListener('touchend',   e => { e.preventDefault(); inputDown=false; tzDn.classList.remove('active'); }, {passive:false});
 tzDn.addEventListener('touchcancel',e => { inputDown=false; tzDn.classList.remove('active'); });
 
 // swipe — only when playing
-let touchY0 = 0;
+let touchY0 = 0, touchX0 = 0;
 canvas.addEventListener('touchstart', e => {
   touchY0 = e.touches[0].clientY;
+  touchX0 = e.touches[0].clientX;
   unlockAudio();
 }, { passive: true });
 canvas.addEventListener('touchmove', e => {
-  e.preventDefault(); // 🔥 IMPORTANT
+  e.preventDefault();
   if(state!=='play') return;
-
-  const dy = e.touches[0].clientY - touchY0;
-  inputUp   = dy < -10;
-  inputDown = dy >  10;
+  // In portrait (canvas rotated 90deg), swipe right = climb, swipe left = dive
+  if (window.innerHeight > window.innerWidth) {
+    const dx = e.touches[0].clientX - touchX0;
+    inputUp   = dx >  10;
+    inputDown = dx < -10;
+  } else {
+    const dy = e.touches[0].clientY - touchY0;
+    inputUp   = dy < -10;
+    inputDown = dy >  10;
+  }
 }, { passive: false });
 
 // Buttons — touchstart for instant mobile response, stopPropagation to prevent bubbling
