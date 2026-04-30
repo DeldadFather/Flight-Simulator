@@ -37,7 +37,7 @@
     color: var(--amber);
     user-select: none;
     -webkit-user-select: none;
-    touch-action: none;
+    touch-action: manipulation;
   }
 
   #game-wrapper {
@@ -644,6 +644,8 @@ document.getElementById('mute-btn').addEventListener('touchstart', e => {
 ['touchstart','mousedown','keydown'].forEach(evt => {
   document.addEventListener(evt, unlockAudio, { once: true });
 });
+// Fix mobile interaction
+document.body.addEventListener('touchstart', () => {}, { passive: true });
 
 const canvas = document.getElementById('game-canvas');
 const ctx    = canvas.getContext('2d');
@@ -779,6 +781,35 @@ document.addEventListener('keyup', e => {
 
 const tzUp = document.getElementById('tz-up');
 const tzDn = document.getElementById('tz-dn');
+// ✅ Modern pointer controls (mobile fix)
+function setupPointerControls(el, onDown, onUp) {
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    unlockAudio();
+    if (state === 'play') onDown();
+    el.classList.add('active');
+  });
+
+  el.addEventListener('pointerup', e => {
+    e.preventDefault();
+    onUp();
+    el.classList.remove('active');
+  });
+
+  el.addEventListener('pointerleave', () => {
+    onUp();
+    el.classList.remove('active');
+  });
+
+  el.addEventListener('pointercancel', () => {
+    onUp();
+    el.classList.remove('active');
+  });
+}
+
+// Apply controls
+setupPointerControls(tzUp, () => inputUp = true, () => inputUp = false);
+setupPointerControls(tzDn, () => inputDown = true, () => inputDown = false);
 tzUp.addEventListener('touchstart', e => { e.preventDefault(); if(state==='play'){inputUp=true; tzUp.classList.add('active');} unlockAudio(); }, {passive:false});
 tzUp.addEventListener('touchend',   e => { e.preventDefault(); inputUp=false;  tzUp.classList.remove('active'); }, {passive:false});
 tzUp.addEventListener('touchcancel',e => { inputUp=false;  tzUp.classList.remove('active'); });
@@ -788,20 +819,25 @@ tzDn.addEventListener('touchcancel',e => { inputDown=false; tzDn.classList.remov
 
 // swipe — only when playing
 let touchY0 = 0;
-canvas.addEventListener('touchstart', e => { if(state==='play') touchY0 = e.touches[0].clientY; }, {passive:true});
-canvas.addEventListener('touchmove',  e => {
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault(); // 🔥 IMPORTANT
   if(state!=='play') return;
+
   const dy = e.touches[0].clientY - touchY0;
   inputUp   = dy < -10;
   inputDown = dy >  10;
-}, {passive:true});
-canvas.addEventListener('touchend', () => { inputUp=false; inputDown=false; });
+}, { passive: false });
 
 // Buttons — touchstart for instant mobile response, stopPropagation to prevent bubbling
-document.getElementById('btn-launch').addEventListener('click', e => { e.stopPropagation(); startGame(); });
-document.getElementById('btn-launch').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); startGame(); }, {passive:false});
-document.getElementById('btn-reboot').addEventListener('click', e => { e.stopPropagation(); reboot(); });
-document.getElementById('btn-reboot').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); reboot(); }, {passive:false});
+function safeStart(e){
+  e.preventDefault();
+  e.stopPropagation();
+  unlockAudio();
+  startGame();
+}
+
+document.getElementById('btn-launch').addEventListener('pointerdown', safeStart);
+document.getElementById('btn-reboot').addEventListener('pointerdown', safeStart);
 
 // ── Helpers ───────────────────────────────────
 function rand(a,b){ return a+Math.random()*(b-a); }
